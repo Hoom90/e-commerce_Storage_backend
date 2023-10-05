@@ -34,14 +34,28 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Getting all by date
+// router.get("/:date", async (req, res) => {
+//   try {
+//     let date = req.params.date;
+//     date = date.replace("-", "/");
+//     date = date.replace("-", "/");
+//     let items = await Item.find({ date: date, logicalDelete: false });
+//     res.json(items);
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// });
+
 // Getting One
 router.get("/:id", async (req, res) => {
   try {
-    let date = req.params.date;
-    date = date.replace("-", "/");
-    date = date.replace("-", "/");
-    let items = await Item.find({ date: date, logicalDelete: false });
-    res.json(items);
+    let item = await Item.findById(req.params.id);
+    if (item == null) {
+      res.status(404).json({ message: "Item Not Found" });
+      return;
+    }
+    res.json(item);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

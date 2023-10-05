@@ -14,14 +14,10 @@ router.get("/", async (req, res) => {
 });
 
 // Getting One
-router.get("/:id", async (req, res) => {
+router.get("/:date", async (req, res) => {
   try {
-    let log = await Log.findById(req.params.id);
-    if (log == null) {
-      res.status(404).json({ message: "Log Not Found" });
-      return;
-    }
-    res.json(log);
+    let logs = await Log.find({ date: req.params.date });
+    res.json(logs);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

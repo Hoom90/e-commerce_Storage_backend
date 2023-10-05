@@ -30,18 +30,18 @@ router.get("/:date", async (req, res) => {
 });
 
 // Getting One
-router.get("/:date", async (req, res) => {
-  try {
-    let log = await Log.findById(req.params.date);
-    if (log == null) {
-      res.status(200).json({ message: "Log Not Found" });
-      return;
-    }
-    res.json(log);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
+// router.get("/:date", async (req, res) => {
+//   try {
+//     let log = await Log.findById(req.params.date);
+//     if (log == null) {
+//       res.status(200).json({ message: "Log Not Found" });
+//       return;
+//     }
+//     res.json(log);
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// });
 
 //Update One
 router.patch("/:id", authenticate, getDocument, async (req, res) => {

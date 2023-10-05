@@ -20,8 +20,8 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Getting One
-router.get("/:id", async (req, res) => {
+// Getting all by date
+router.get("/:date", async (req, res) => {
   try {
     let date = req.params.date;
     date = date.replace("-", "/");
