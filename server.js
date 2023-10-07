@@ -31,4 +31,4 @@ app.use("/api/itemLogs", itemLogsRouter);
 app.use("/api/balanceLogs", balanceLogsRouter);
 app.use("/api", authRouter);
 
-app.listen(3000, () => console.log("Server Started"));
+app.listen(3002, () => console.log("Server Started"));

@@ -26,7 +26,7 @@ router.get("/:date", async (req, res) => {
     let date = req.params.date;
     date = date.replace("-", "/");
     date = date.replace("-", "/");
-    let documents = await Document.find({ date: date, logicalDelete: false });
+    let documents = await Document.find({ date: date });
     res.json(documents);
   } catch (err) {
     res.status(500).json({ message: err.message });
