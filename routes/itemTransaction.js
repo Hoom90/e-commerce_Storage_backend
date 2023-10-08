@@ -1,8 +1,8 @@
 const express = require("express");
 const { MongoClient } = require("mongodb");
 const router = express.Router();
-const Log = require("../models/balanceLog");
-const Document = require("../models/balance");
+const History = require("../models/balanceHistory");
+const Balance = require("../models/balance");
 const Item = require("../models/item");
 const ItemLogs = require("../models/itemLog");
 require("dotenv").config();
@@ -33,19 +33,6 @@ router.get("/", async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-
-// Getting all by date
-// router.get("/:date", async (req, res) => {
-//   try {
-//     let date = req.params.date;
-//     date = date.replace("-", "/");
-//     date = date.replace("-", "/");
-//     let items = await Item.find({ date: date, logicalDelete: false });
-//     res.json(items);
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// });
 
 // Getting One
 router.get("/:id", async (req, res) => {
@@ -125,7 +112,7 @@ router.patch(
           }
         }
         if (req.body.weight) {
-          if (req.body.weight != req.body.weight) {
+          if (req.body.weight != res.item.weight) {
             oldVal.push(res.item.weight);
             newVal.push(req.body.weight);
             field.push("وزن کالا");
@@ -179,9 +166,9 @@ router.patch(
           }
         }
         if (req.body.date) {
-          if (req.body.date != req.body.date) {
-            oldVal.push(res.item.billId);
-            newVal.push(req.body.billId);
+          if (req.body.date != res.item.date) {
+            oldVal.push(res.item.date);
+            newVal.push(req.body.date);
             field.push("تاریخ دریافت کالا");
 
             res.item.date = req.body.date;
@@ -243,22 +230,22 @@ router.put("/:id", authenticate, getItem, async (req, res) => {
         field: "فروش/عودت کالا",
         date: req.body.date,
       });
-      const document = new Document({
+      const balance = new Balance({
         income: req.body.income,
         outcome: req.body.outcome,
         balance: req.body.balance,
         date: req.body.date,
       });
-      let log = new Log({
+      let history = new History({
         cash: "0",
         card: parseInt(req.body.income) + parseInt(req.body.outcome),
         date: req.body.date,
         logicalDelete: false,
       });
-      await log.save();
-      await document.save();
-      await res.item.save();
-      await newLog.save();
+      await history.save(); // save history
+      await balance.save(); // save balance
+      await newLog.save(); //save log
+      await res.item.save(); // edit item
       res.status(200);
       await session.commitTransaction();
     } else {

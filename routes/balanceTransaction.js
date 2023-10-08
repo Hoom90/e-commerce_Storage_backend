@@ -2,7 +2,7 @@ const express = require("express");
 const { MongoClient } = require("mongodb");
 const router = express.Router();
 const Document = require("../models/balance");
-const Log = require("../models/balanceLog");
+const Log = require("../models/balanceHistory");
 require("dotenv").config();
 
 const authenticate = require("../middleware/authenticate");

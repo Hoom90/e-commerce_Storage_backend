@@ -21,14 +21,14 @@ app.use(cors());
 const itemTransactionRouter = require("./routes/itemTransaction");
 const balanceTranactionRouter = require("./routes/balanceTransaction");
 const itemLogsRouter = require("./routes/itemLogs");
-const balanceLogsRouter = require("./routes/balanceLogs");
+const balanceHistoriesRouter = require("./routes/balanceHistories");
 const authRouter = require("./routes/auth");
 
 app.use(express.static("public"));
 app.use("/api/itemTransaction", itemTransactionRouter);
 app.use("/api/balanceTransaction", balanceTranactionRouter);
 app.use("/api/itemLogs", itemLogsRouter);
-app.use("/api/balanceLogs", balanceLogsRouter);
+app.use("/api/balanceHistories", balanceHistoriesRouter);
 app.use("/api", authRouter);
 
 app.listen(3002, () => console.log("Server Started"));

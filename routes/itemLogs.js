@@ -16,7 +16,10 @@ router.get("/", async (req, res) => {
 // Getting One
 router.get("/:date", async (req, res) => {
   try {
-    let logs = await Log.find({ date: req.params.date });
+    let date = req.params.date;
+    date = date.replace("-", "/");
+    date = date.replace("-", "/");
+    let logs = await Log.find({ date: date });
     res.json(logs);
   } catch (err) {
     res.status(500).json({ message: err.message });

@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const balanceLogSchema = new mongoose.Schema(
+const balanceHistorySchema = new mongoose.Schema(
   {
     cost: String,
     personName: String,
@@ -13,4 +13,4 @@ const balanceLogSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("BalanceLog", balanceLogSchema);
+module.exports = mongoose.model("BalanceHistory", balanceHistorySchema);

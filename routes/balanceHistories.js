@@ -1,8 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const Log = require("../models/balanceLog");
+const Log = require("../models/balanceHistory");
 require("dotenv").config();
-const dayjs = require("dayjs");
 
 const authenticate = require("../middleware/authenticate");
 
@@ -28,20 +27,6 @@ router.get("/:date", async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-
-// Getting One
-// router.get("/:date", async (req, res) => {
-//   try {
-//     let log = await Log.findById(req.params.date);
-//     if (log == null) {
-//       res.status(200).json({ message: "Log Not Found" });
-//       return;
-//     }
-//     res.json(log);
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// });
 
 //Update One
 router.patch("/:id", authenticate, getDocument, async (req, res) => {
