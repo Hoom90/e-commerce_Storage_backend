@@ -5,40 +5,61 @@ const jwt = require("jsonwebtoken");
 const router = express.Router();
 require("dotenv").config();
 
-router.post("/register", (req, res, next) => {
-  try {
-    bcrypt.hash(req.body.password, 10, function (err, hashedPass) {
-      if (err) {
-        res.json({
-          error: err,
-        });
-      }
+// router.post("/register", (req, res, next) => {
+//   try {
+//     bcrypt.hash(req.body.password, 10, function (err, hashedPass) {
+//       if (err) {
+//         res.json({
+//           error: err,
+//         });
+//       }
 
-      let user = new User({
-        username: req.body.username,
-        password: hashedPass,
-      });
+//       let user = new User({
+//         username: req.body.username,
+//         password: hashedPass,
+//       });
 
-      user
-        .save()
-        .then((user) => {
-          res.status(201).json({
-            message: "User Added Successfully!",
-          });
-        })
-        .catch((error) => {
-          res.json({
-            message: "An error occured!",
-          });
-        });
-    });
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-});
+//       user
+//         .save()
+//         .then((user) => {
+//           res.status(201).json({
+//             message: "User Added Successfully!",
+//           });
+//         })
+//         .catch((error) => {
+//           res.json({
+//             message: "An error occured!",
+//           });
+//         });
+//     });
+//   } catch (err) {
+//     res.status(400).json({ message: err.message });
+//   }
+// });
 
 router.post("/login", async (req, res, next) => {
   try {
+    const db = await User.find();
+    if (db.length == 0) {
+      let password = "123";
+      let username = "admin";
+      bcrypt.hash(password, 10, function (err, hashedPass) {
+        if (err) {
+          res.json({
+            error: err,
+          });
+        }
+
+        let user = new User({
+          username,
+          password: hashedPass,
+        });
+
+        user.save().then((user) => {
+          req.body = { username, password };
+        });
+      });
+    }
     const { username, password } = req.body;
 
     const user = await User.findOne({ username });

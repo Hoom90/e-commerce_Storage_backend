@@ -12,18 +12,6 @@ const client = new MongoClient(process.env.DATABASE_URL, {
   useUnifiedTopology: true,
 });
 
-const multer = require("multer");
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "./public/");
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.originalname);
-  },
-});
-
-const upload = multer({ storage: storage });
-
 // Getting all
 router.get("/", async (req, res) => {
   try {
@@ -49,16 +37,36 @@ router.get("/:id", async (req, res) => {
 });
 
 // Creating one
-router.post("/", authenticate, upload.single("file"), async (req, res) => {
+router.post("/", authenticate, async (req, res) => {
   let session;
   try {
     session = client.startSession();
     session.startTransaction();
-    if (req.body.name == null) {
+    if (
+      req.body.name == null ||
+      req.body.income == null ||
+      req.body.outcome == null ||
+      req.body.balance == null ||
+      req.body.basePrice == null ||
+      req.body.amount == null
+    ) {
       res.status(204);
       session.abortTransaction();
       return;
     } else {
+      const balance = new Balance({
+        income: req.body.income,
+        outcome: req.body.outcome,
+        balance: req.body.balance,
+        date: req.body.date,
+      });
+      let history = new History({
+        cash: "0",
+        card: -req.body.outcome,
+        date: req.body.date,
+        description: req.body.description,
+        logicalDelete: false,
+      });
       const item = new Item({
         name: req.body.name,
         weight: req.body.weight,
@@ -70,9 +78,11 @@ router.post("/", authenticate, upload.single("file"), async (req, res) => {
         date: req.body.date,
         logicalDelete: false,
       });
+      await history.save(); // save history
+      await balance.save(); // save balance
       await item.save();
       const newLog = new ItemLogs({
-        description: "افزودن کالای جدید <" + req.body.name + "> به سیستم.",
+        description: "خرید کالای جدید <" + req.body.name + "> به سیستم.",
         date: req.body.date,
       });
       res.status(201).json(await newLog.save());
@@ -87,125 +97,119 @@ router.post("/", authenticate, upload.single("file"), async (req, res) => {
 });
 
 // Updating One
-router.patch(
-  "/:id",
-  authenticate,
-  upload.single("file"),
-  getItem,
-  async (req, res) => {
-    let session;
-    try {
-      session = client.startSession();
-      session.startTransaction();
-      if (req.body.update) {
-        let name = res.item.name;
-        let oldVal = [];
-        let newVal = [];
-        let field = [];
-        if (req.body.name) {
-          if (req.body.name != res.item.name) {
-            oldVal.push(res.item.name);
-            newVal.push(req.body.name);
-            field.push("نام کالا");
+router.patch("/:id", authenticate, getItem, async (req, res) => {
+  let session;
+  try {
+    session = client.startSession();
+    session.startTransaction();
+    if (req.body.update) {
+      let name = res.item.name;
+      let oldVal = [];
+      let newVal = [];
+      let field = [];
+      if (req.body.name) {
+        if (req.body.name != res.item.name) {
+          oldVal.push(res.item.name);
+          newVal.push(req.body.name);
+          field.push("نام کالا");
 
-            res.item.name = req.body.name;
-          }
+          res.item.name = req.body.name;
         }
-        if (req.body.weight) {
-          if (req.body.weight != res.item.weight) {
-            oldVal.push(res.item.weight);
-            newVal.push(req.body.weight);
-            field.push("وزن کالا");
-
-            res.item.weight = req.body.weight;
-          }
-        }
-        if (req.body.basePrice) {
-          if (req.body.basePrice != res.item.basePrice) {
-            oldVal.push(res.item.basePrice);
-            newVal.push(req.body.basePrice);
-            field.push("قیمت خرید کالا");
-
-            res.item.basePrice = req.body.basePrice;
-          }
-        }
-        if (req.body.price) {
-          if (req.body.price != res.item.price) {
-            oldVal.push(res.item.price);
-            newVal.push(req.body.price);
-            field.push("قیمت فروش کالا");
-
-            res.item.price = req.body.price;
-          }
-        }
-        if (req.body.profit) {
-          if (req.body.profit != res.item.profit) {
-            oldVal.push(res.item.profit);
-            newVal.push(req.body.profit);
-            field.push("سود کالا");
-
-            res.item.profit = req.body.profit;
-          }
-        }
-        if (req.body.amount) {
-          if (req.body.amount != res.item.amount) {
-            oldVal.push(res.item.amount);
-            newVal.push(req.body.amount);
-            field.push("موجودی کالا");
-
-            res.item.amount = req.body.amount;
-          }
-        }
-        if (req.body.billId) {
-          if (req.body.billId != res.item.billId) {
-            oldVal.push(res.item.billId);
-            newVal.push(req.body.billId);
-            field.push("مشخصات فاکتور کالا");
-
-            res.item.billId = req.body.billId;
-          }
-        }
-        if (req.body.date) {
-          if (req.body.date != res.item.date) {
-            oldVal.push(res.item.date);
-            newVal.push(req.body.date);
-            field.push("تاریخ دریافت کالا");
-
-            res.item.date = req.body.date;
-          }
-        }
-
-        let description = "ویرایش <" + name + ">. ";
-        for (let i = 0; i < oldVal.length; i++) {
-          description =
-            description +
-            "<" +
-            field[i] +
-            "> از " +
-            oldVal[i] +
-            "به " +
-            newVal[i] +
-            ". ";
-        }
-        await res.item.save();
-        const newLog = new ItemLogs({
-          description,
-          date: req.body.update,
-        });
-        res.status(200).json(await newLog.save());
-        await session.commitTransaction();
-      } else {
-        res.status(204);
-        session.abortTransaction();
       }
-    } catch (err) {
-      res.status(400).json({ message: err.message });
+      if (req.body.weight) {
+        if (req.body.weight != res.item.weight) {
+          oldVal.push(res.item.weight);
+          newVal.push(req.body.weight);
+          field.push("وزن کالا");
+
+          res.item.weight = req.body.weight;
+        }
+      }
+      if (req.body.basePrice) {
+        if (req.body.basePrice != res.item.basePrice) {
+          oldVal.push(res.item.basePrice);
+          newVal.push(req.body.basePrice);
+          field.push("قیمت خرید کالا");
+
+          res.item.basePrice = req.body.basePrice;
+        }
+      }
+      if (req.body.price) {
+        if (req.body.price != res.item.price) {
+          oldVal.push(res.item.price);
+          newVal.push(req.body.price);
+          field.push("قیمت فروش کالا");
+
+          res.item.price = req.body.price;
+        }
+      }
+      if (req.body.profit) {
+        if (req.body.profit != res.item.profit) {
+          oldVal.push(res.item.profit);
+          newVal.push(req.body.profit);
+          field.push("سود کالا");
+
+          res.item.profit = req.body.profit;
+        }
+      }
+      if (req.body.amount) {
+        if (req.body.amount != res.item.amount) {
+          oldVal.push(res.item.amount);
+          newVal.push(req.body.amount);
+          field.push("موجودی کالا");
+
+          res.item.amount = req.body.amount;
+        }
+      }
+      if (req.body.billId) {
+        if (req.body.billId != res.item.billId) {
+          oldVal.push(res.item.billId);
+          newVal.push(req.body.billId);
+          field.push("مشخصات فاکتور کالا");
+
+          res.item.billId = req.body.billId;
+        }
+      }
+      if (req.body.date) {
+        if (req.body.date != res.item.date) {
+          oldVal.push(res.item.date);
+          newVal.push(req.body.date);
+          field.push("تاریخ دریافت کالا");
+
+          res.item.date = req.body.date;
+        }
+      }
+
+      let description = "ویرایش <" + name + ">. ";
+      for (let i = 0; i < oldVal.length; i++) {
+        description =
+          description +
+          "<" +
+          field[i] +
+          "> از " +
+          oldVal[i] +
+          "به " +
+          newVal[i] +
+          ". ";
+      }
+      await res.item.save();
+      const newLog = new ItemLogs({
+        description,
+        date: req.body.update,
+      });
+      res.status(200).json(await newLog.save());
+      await session.commitTransaction();
+    } else {
+      res.status(204);
       session.abortTransaction();
-    } finally {
-      session.endSession();
     }
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+    session.abortTransaction();
+  } finally {
+    session.endSession();
   }
-);
+});
 
 // Updating One Amount
 router.put("/:id", authenticate, getItem, async (req, res) => {
@@ -227,7 +231,7 @@ router.put("/:id", authenticate, getItem, async (req, res) => {
         name,
         oldVal,
         newVal: req.body.amount,
-        field: "فروش/عودت کالا",
+        field: "فروش کالا",
         date: req.body.date,
       });
       const balance = new Balance({
@@ -240,6 +244,7 @@ router.put("/:id", authenticate, getItem, async (req, res) => {
         cash: "0",
         card: parseInt(req.body.income) + parseInt(req.body.outcome),
         date: req.body.date,
+        description: req.body.description,
         logicalDelete: false,
       });
       await history.save(); // save history
@@ -266,12 +271,33 @@ router.delete("/:id", authenticate, getItem, async (req, res) => {
   try {
     session = client.startSession();
     session.startTransaction();
-    if (req.body.logicalDelete && req.body.date) {
+    if (
+      req.body.logicalDelete != null &&
+      req.body.date != null &&
+      req.body.income != null &&
+      req.body.outcome != null &&
+      req.body.balance != null
+    ) {
       res.item.logicalDelete = req.body.logicalDelete;
+      const balance = new Balance({
+        income: req.body.income,
+        outcome: req.body.outcome,
+        balance: req.body.balance,
+        date: req.body.date,
+      });
+      let history = new History({
+        cash: "0",
+        card: -req.body.outcome,
+        date: req.body.date,
+        description: req.body.description,
+        logicalDelete: false,
+      });
       const newLog = new ItemLogs({
         description: "حذف کالای<" + res.item.name + "> از سیستم.",
         date: req.body.date,
       });
+      await history.save(); // save history
+      await balance.save(); // save balance
       await res.item.save();
       await newLog.save();
       res.status(200).json({ message: "Deleted Item" });

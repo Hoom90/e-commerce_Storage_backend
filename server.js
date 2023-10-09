@@ -31,4 +31,4 @@ app.use("/api/itemLogs", itemLogsRouter);
 app.use("/api/balanceHistories", balanceHistoriesRouter);
 app.use("/api", authRouter);
 
-app.listen(3002, () => console.log("Server Started"));
+app.listen(process.env.PORT, () => console.log("Server Started"));

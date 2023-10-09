@@ -62,7 +62,7 @@ router.post("/", authenticate, async (req, res) => {
     let personName = req.body.personName;
     let description = req.body.description;
 
-    if (cost == null || personName == null || description == null) {
+    if (cost == null || personName == null) {
       let cash = req.body.cash;
       let card = req.body.card;
 
@@ -75,6 +75,7 @@ router.post("/", authenticate, async (req, res) => {
       log = new Log({
         cash: cash,
         card: card,
+        description: description,
         date: req.body.date,
         logicalDelete: false,
       });
