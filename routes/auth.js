@@ -5,38 +5,6 @@ const jwt = require("jsonwebtoken");
 const router = express.Router();
 require("dotenv").config();
 
-// router.post("/register", (req, res, next) => {
-//   try {
-//     bcrypt.hash(req.body.password, 10, function (err, hashedPass) {
-//       if (err) {
-//         res.json({
-//           error: err,
-//         });
-//       }
-
-//       let user = new User({
-//         username: req.body.username,
-//         password: hashedPass,
-//       });
-
-//       user
-//         .save()
-//         .then((user) => {
-//           res.status(201).json({
-//             message: "User Added Successfully!",
-//           });
-//         })
-//         .catch((error) => {
-//           res.json({
-//             message: "An error occured!",
-//           });
-//         });
-//     });
-//   } catch (err) {
-//     res.status(400).json({ message: err.message });
-//   }
-// });
-
 router.post("/login", async (req, res, next) => {
   try {
     const db = await User.find();

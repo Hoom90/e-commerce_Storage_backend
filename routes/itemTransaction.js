@@ -44,10 +44,10 @@ router.post("/", authenticate, async (req, res) => {
     session.startTransaction();
     if (
       req.body.name == null ||
-      req.body.income == null ||
       req.body.outcome == null ||
       req.body.balance == null ||
       req.body.basePrice == null ||
+      req.body.card == null ||
       req.body.amount == null
     ) {
       res.status(204);
@@ -55,14 +55,14 @@ router.post("/", authenticate, async (req, res) => {
       return;
     } else {
       const balance = new Balance({
-        income: req.body.income,
+        income: "0",
         outcome: req.body.outcome,
         balance: req.body.balance,
         date: req.body.date,
       });
       let history = new History({
         cash: "0",
-        card: -req.body.outcome,
+        card: req.body.card,
         date: req.body.date,
         description: req.body.description,
         logicalDelete: false,
@@ -82,10 +82,81 @@ router.post("/", authenticate, async (req, res) => {
       await balance.save(); // save balance
       await item.save();
       const newLog = new ItemLogs({
-        description: "خرید کالای جدید <" + req.body.name + "> به سیستم.",
+        description: "خرید کالای جدید <" + req.body.name + ">.",
         date: req.body.date,
       });
       res.status(201).json(await newLog.save());
+      await session.commitTransaction();
+    }
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+    session.abortTransaction();
+  } finally {
+    session.endSession();
+  }
+});
+
+// Creating list
+router.post("/list", authenticate, async (req, res) => {
+  let session;
+  try {
+    let data = req.body;
+    let account = data[0];
+    session = client.startSession();
+    session.startTransaction();
+    if (
+      account.outcome == null ||
+      account.balance == null ||
+      account.card == null
+    ) {
+      res.status(204);
+      session.abortTransaction();
+      return;
+    }
+    const balance = new Balance({
+      income: "0", // ورودی از طریق خرید کالا وجود ندارد
+      outcome: account.outcome, // بدهی از طریق خرید کالا اینجا ثبت میشود
+      balance: account.balance, // بدهی از روی حساب کسر میشود
+      date: account.date,
+    });
+    let history = new History({
+      cash: "0", // هیچ مقداری نقدا پرداخت نشده است
+      card: account.card, // مقدار پرداختی از طریق کالا به شکل کارتی پرداخت شده است
+      date: account.date,
+      description: account.description,
+      logicalDelete: false,
+    });
+    await history.save(); // save history
+    await balance.save(); // save balance
+    for (let i = 1; i < data.length; i++) {
+      if (
+        data[i].name == null ||
+        data[i].basePrice == null ||
+        data[i].amount == null
+      ) {
+        res.status(204);
+        session.abortTransaction();
+        return;
+      } else {
+        const item = new Item({
+          name: data[i].name,
+          weight: data[i].weight,
+          basePrice: data[i].basePrice,
+          price: data[i].price,
+          profit: data[i].profit,
+          amount: data[i].amount,
+          billId: data[i].billId,
+          date: data[i].date,
+          logicalDelete: false,
+        });
+        const newLog = new ItemLogs({
+          description: "خرید کالای جدید <" + data[i].name + ">.",
+          date: data[i].date,
+        });
+        await item.save();
+        await newLog.save();
+      }
+      res.status(201).json();
       await session.commitTransaction();
     }
   } catch (err) {
