@@ -290,9 +290,9 @@ router.put("/:id", authenticate, getItem, async (req, res) => {
     session.startTransaction();
     if (
       req.body.income &&
-      req.body.outcome &&
       req.body.balance &&
       req.body.amount &&
+      req.body.profit &&
       req.body.date
     ) {
       let oldVal = res.item.amount;
@@ -303,17 +303,18 @@ router.put("/:id", authenticate, getItem, async (req, res) => {
         oldVal,
         newVal: req.body.amount,
         field: "فروش کالا",
+        profit: req.body.profit,
         date: req.body.date,
       });
       const balance = new Balance({
         income: req.body.income,
-        outcome: req.body.outcome,
+        outcome: "0",
         balance: req.body.balance,
         date: req.body.date,
       });
       let history = new History({
         cash: "0",
-        card: parseInt(req.body.income) + parseInt(req.body.outcome),
+        card: parseInt(req.body.income),
         date: req.body.date,
         description: req.body.description,
         logicalDelete: false,

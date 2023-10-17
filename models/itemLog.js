@@ -7,6 +7,7 @@ const itemLogSchema = new schema(
     oldVal: String,
     newVal: String,
     field: String,
+    profit: String,
     description: String,
     date: String,
   },
