@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const Log = require("../models/itemLog");
+const Log = require("../models/itemHistory");
 require("dotenv").config();
 
 // Getting all
@@ -17,7 +17,6 @@ router.get("/", async (req, res) => {
 router.get("/:date", async (req, res) => {
   try {
     let date = req.params.date;
-    date = date.replace("-", "/").replace("-", "/");
     let logs = await Log.find({ date: date });
     res.json(logs);
   } catch (err) {

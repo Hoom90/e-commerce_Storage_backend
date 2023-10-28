@@ -20,14 +20,14 @@ app.use(cors());
 
 const itemTransactionRouter = require("./routes/itemTransaction");
 const balanceTranactionRouter = require("./routes/balanceTransaction");
-const itemLogsRouter = require("./routes/itemLogs");
+const itemHistoriesRouter = require("./routes/itemHistories");
 const balanceHistoriesRouter = require("./routes/balanceHistories");
 const authRouter = require("./routes/auth");
 
 app.use(express.static("public"));
 app.use("/api/itemTransaction", itemTransactionRouter);
 app.use("/api/balanceTransaction", balanceTranactionRouter);
-app.use("/api/itemLogs", itemLogsRouter);
+app.use("/api/itemHistories", itemHistoriesRouter);
 app.use("/api/balanceHistories", balanceHistoriesRouter);
 app.use("/api", authRouter);
 

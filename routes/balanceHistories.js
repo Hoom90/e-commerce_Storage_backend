@@ -19,7 +19,6 @@ router.get("/", async (req, res) => {
 router.get("/:date", async (req, res) => {
   try {
     let date = req.params.date;
-    date = date.replace("-", "/").replace("-", "/");
     let logs = await BalanceHistory.find({ date: date });
     res.json(logs);
   } catch (err) {
