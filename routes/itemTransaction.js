@@ -1,13 +1,14 @@
 const express = require("express");
 const { MongoClient } = require("mongodb");
 const router = express.Router();
-const History = require("../models/balanceHistory");
-const Balance = require("../models/balance");
 const Item = require("../models/item");
-const ItemLogs = require("../models/itemLog");
+const ItemHistory = require("../models/itemHistory");
+const BalanceHistory = require("../models/balanceHistory");
+const Balance = require("../models/balance");
 require("dotenv").config();
 
 const authenticate = require("../middleware/authenticate");
+const itemHistory = require("../models/itemHistory");
 const client = new MongoClient(process.env.DATABASE_URL, {
   useUnifiedTopology: true,
 });
@@ -15,7 +16,7 @@ const client = new MongoClient(process.env.DATABASE_URL, {
 // Getting all
 router.get("/", async (req, res) => {
   try {
-    const items = await Item.find({ logicalDelete: false });
+    const items = await Item.find();
     res.status(200).json(items);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -37,57 +38,100 @@ router.get("/:id", async (req, res) => {
 });
 
 // Creating one
-router.post("/", authenticate, async (req, res) => {
+router.post("/", authenticate, getLastBalanceData, async (req, res) => {
   let session;
   try {
-    session = client.startSession();
-    session.startTransaction();
+    // item feature
+    let name = req.body.name;
+    let company = req.body.company;
+    let purchasePrice = req.body.purchasePrice;
+    let salesPrice = req.body.salesPrice;
+    let amount = req.body.amount;
+    let unit = req.body.unit;
+    let sellerName = req.body.sellerName;
+    let date = req.body.date;
+    // item dependency
+    let paid = req.body.paid;
+    let type = req.body.type;
+    let description = req.body.description;
+
     if (
-      req.body.name == null ||
-      req.body.outcome == null ||
-      req.body.balance == null ||
-      req.body.basePrice == null ||
-      req.body.card == null ||
-      req.body.amount == null
+      name == null ||
+      company == null ||
+      purchasePrice == null ||
+      salesPrice == null ||
+      amount == null ||
+      unit == null ||
+      sellerName == null ||
+      date == null ||
+      paid == null ||
+      type == null ||
+      description == null
     ) {
       res.status(204);
-      session.abortTransaction();
       return;
-    } else {
-      const balance = new Balance({
-        income: "0",
-        outcome: req.body.outcome,
-        balance: req.body.balance,
-        date: req.body.date,
-      });
-      let history = new History({
-        cash: "0",
-        card: req.body.card,
-        date: req.body.date,
-        description: req.body.description,
-        logicalDelete: false,
-      });
-      const item = new Item({
-        name: req.body.name,
-        weight: req.body.weight,
-        basePrice: req.body.basePrice,
-        price: req.body.price,
-        profit: req.body.profit,
-        amount: req.body.amount,
-        billId: req.body.billId,
-        date: req.body.date,
-        logicalDelete: false,
-      });
-      await history.save(); // save history
-      await balance.save(); // save balance
-      await item.save();
-      const newLog = new ItemLogs({
-        description: "خرید کالای جدید <" + req.body.name + ">.",
-        date: req.body.date,
-      });
-      res.status(201).json(await newLog.save());
-      await session.commitTransaction();
     }
+
+    let profit = purchasePrice - salesPrice;
+    let liquidity = purchasePrice * amount;
+    let cost = purchasePrice * amount;
+    let debt = cost - paid;
+    let current = res.balance.current - paid;
+    let logDescription = "خرید کالای جدید <" + name + ">.";
+
+    session = client.startSession();
+    session.startTransaction();
+
+    // fill Item props
+    const item = new Item({
+      name,
+      company,
+      purchasePrice,
+      salesPrice,
+      profit,
+      amount,
+      unit,
+      liquidity,
+      sellerName,
+      date,
+    });
+
+    // fill Item History props
+    const itemHistory = new itemHistory({
+      item: name,
+      company,
+      previousAmount: "0",
+      newAmount: amount,
+      action: "خرید",
+      profit,
+      logDescription,
+      date,
+    });
+
+    // // fill Item Balance Effect History props
+    const balanceHistory = new BalanceHistory({
+      receiverName: sellerName,
+      amount: -paid,
+      debt,
+      type,
+      description,
+      date,
+    });
+
+    // fill Item Balane Effect props
+    const balance = new Balance({
+      action: -paid,
+      current,
+      date,
+    });
+
+    await item.save();
+    await itemHistory.save();
+    await balanceHistory.save();
+    await balance.save();
+
+    res.status(200);
+    await session.commitTransaction();
   } catch (err) {
     res.status(400).json({ message: err.message });
     session.abortTransaction();
@@ -97,68 +141,114 @@ router.post("/", authenticate, async (req, res) => {
 });
 
 // Creating list
-router.post("/list", authenticate, async (req, res) => {
+router.post("/list", authenticate, getLastBalanceData, async (req, res) => {
   let session;
   try {
     let data = req.body;
-    let account = data[0];
-    session = client.startSession();
-    session.startTransaction();
+    let cost = req.body[0].cost;
+    let paid = req.body[0].paid;
+    let type = req.body[0].type;
+    let date = req.body[0].date;
+    let description = req.body[0].description;
+
     if (
-      account.outcome == null ||
-      account.balance == null ||
-      account.card == null
+      cost == null ||
+      paid == null ||
+      type == null ||
+      description == null ||
+      date == null
     ) {
       res.status(204);
-      session.abortTransaction();
       return;
     }
+
+    session = client.startSession();
+    session.startTransaction();
+
+    let debt = cost - paid;
+    let current = res.balance.current - paid;
+    let sellerName = data[1].sellerName;
+
+    // // fill Item Balance Effect History props
+    const balanceHistory = new BalanceHistory({
+      receiverName: sellerName,
+      amount: -paid,
+      debt,
+      type,
+      description,
+      date,
+    });
+
+    // fill Item Balane Effect props
     const balance = new Balance({
-      income: "0", // ورودی از طریق خرید کالا وجود ندارد
-      outcome: account.outcome, // بدهی از طریق خرید کالا اینجا ثبت میشود
-      balance: account.balance, // بدهی از روی حساب کسر میشود
-      date: account.date,
+      action: -paid,
+      current,
+      date,
     });
-    let history = new History({
-      cash: "0", // هیچ مقداری نقدا پرداخت نشده است
-      card: account.card, // مقدار پرداختی از طریق کالا به شکل کارتی پرداخت شده است
-      date: account.date,
-      description: account.description,
-      logicalDelete: false,
-    });
-    await history.save(); // save history
-    await balance.save(); // save balance
+
     for (let i = 1; i < data.length; i++) {
+      // item feature
+      let name = data[i].name;
+      let company = data[i].company;
+      let purchasePrice = data[i].purchasePrice;
+      let salesPrice = data[i].salesPrice;
+      let amount = data[i].amount;
+      let unit = data[i].unit;
+      let sellerName = data[i].sellerName;
+      let date = data[i].date;
+
+      let profit = purchasePrice - salesPrice;
+      let liquidity = purchasePrice * amount;
+      let logDescription = "خرید کالای جدید <" + name + ">.";
+
       if (
-        data[i].name == null ||
-        data[i].basePrice == null ||
-        data[i].amount == null
+        name == null ||
+        company == null ||
+        purchasePrice == null ||
+        salesPrice == null ||
+        amount == null ||
+        unit == null ||
+        sellerName == null ||
+        date == null
       ) {
         res.status(204);
         session.abortTransaction();
         return;
       } else {
+        // fill Item props
         const item = new Item({
-          name: data[i].name,
-          weight: data[i].weight,
-          basePrice: data[i].basePrice,
-          price: data[i].price,
-          profit: data[i].profit,
-          amount: data[i].amount,
-          billId: data[i].billId,
-          date: data[i].date,
-          logicalDelete: false,
+          name,
+          company,
+          purchasePrice,
+          salesPrice,
+          profit,
+          amount,
+          unit,
+          liquidity,
+          sellerName,
+          date,
         });
-        const newLog = new ItemLogs({
-          description: "خرید کالای جدید <" + data[i].name + ">.",
-          date: data[i].date,
+        // fill Item History props
+        const itemHistory = new itemHistory({
+          item: name,
+          company,
+          previousAmount: "0",
+          newAmount: amount,
+          action: "خرید",
+          profit,
+          logDescription,
+          date,
         });
         await item.save();
-        await newLog.save();
+        await itemHistory.save();
       }
-      res.status(201).json();
-      await session.commitTransaction();
     }
+
+    await balance.save();
+    await balanceHistory.save();
+
+    res.status(200);
+    await session.commitTransaction();
   } catch (err) {
     res.status(400).json({ message: err.message });
     session.abortTransaction();
@@ -171,109 +261,85 @@ router.post("/list", authenticate, async (req, res) => {
 router.patch("/:id", authenticate, getItem, async (req, res) => {
   let session;
   try {
+    // item feature
+    let name = req.body.name;
+    let salesPrice = req.body.salesPrice;
+    let date = req.body.date;
+    // item dependency
+    let update = req.body.update;
+
+    if (name == null && salesPrice == null && date == null && update == null) {
+      res.status(204);
+      return;
+    }
+
     session = client.startSession();
     session.startTransaction();
-    if (req.body.update) {
-      let name = res.item.name;
-      let oldVal = [];
-      let newVal = [];
-      let field = [];
-      if (req.body.name) {
-        if (req.body.name != res.item.name) {
-          oldVal.push(res.item.name);
-          newVal.push(req.body.name);
-          field.push("نام کالا");
 
-          res.item.name = req.body.name;
-        }
-      }
-      if (req.body.weight) {
-        if (req.body.weight != res.item.weight) {
-          oldVal.push(res.item.weight);
-          newVal.push(req.body.weight);
-          field.push("وزن کالا");
+    let oldVal = [];
+    let newVal = [];
+    let field = [];
+    let nameHistory = res.item.name;
+    let description = "ویرایش <" + nameHistory + ">. ";
 
-          res.item.weight = req.body.weight;
-        }
-      }
-      if (req.body.basePrice) {
-        if (req.body.basePrice != res.item.basePrice) {
-          oldVal.push(res.item.basePrice);
-          newVal.push(req.body.basePrice);
-          field.push("قیمت خرید کالا");
+    if (name) {
+      if (name != nameHistory) {
+        oldVal.push(nameHistory);
+        newVal.push(name);
+        field.push("نام کالا");
 
-          res.item.basePrice = req.body.basePrice;
-        }
+        res.item.name = name;
+        nameHistory = name;
       }
-      if (req.body.price) {
-        if (req.body.price != res.item.price) {
-          oldVal.push(res.item.price);
-          newVal.push(req.body.price);
-          field.push("قیمت فروش کالا");
-
-          res.item.price = req.body.price;
-        }
-      }
-      if (req.body.profit) {
-        if (req.body.profit != res.item.profit) {
-          oldVal.push(res.item.profit);
-          newVal.push(req.body.profit);
-          field.push("سود کالا");
-
-          res.item.profit = req.body.profit;
-        }
-      }
-      if (req.body.amount) {
-        if (req.body.amount != res.item.amount) {
-          oldVal.push(res.item.amount);
-          newVal.push(req.body.amount);
-          field.push("موجودی کالا");
-
-          res.item.amount = req.body.amount;
-        }
-      }
-      if (req.body.billId) {
-        if (req.body.billId != res.item.billId) {
-          oldVal.push(res.item.billId);
-          newVal.push(req.body.billId);
-          field.push("مشخصات فاکتور کالا");
-
-          res.item.billId = req.body.billId;
-        }
-      }
-      if (req.body.date) {
-        if (req.body.date != res.item.date) {
-          oldVal.push(res.item.date);
-          newVal.push(req.body.date);
-          field.push("تاریخ دریافت کالا");
-
-          res.item.date = req.body.date;
-        }
-      }
-
-      let description = "ویرایش <" + name + ">. ";
-      for (let i = 0; i < oldVal.length; i++) {
-        description =
-          description +
-          "<" +
-          field[i] +
-          "> از " +
-          oldVal[i] +
-          "به " +
-          newVal[i] +
-          ". ";
-      }
-      await res.item.save();
-      const newLog = new ItemLogs({
-        description,
-        date: req.body.update,
-      });
-      res.status(200).json(await newLog.save());
-      await session.commitTransaction();
-    } else {
-      res.status(204);
-      session.abortTransaction();
     }
+    if (salesPrice) {
+      if (salesPrice != res.item.salesPrice) {
+        oldVal.push(res.item.salesPrice);
+        newVal.push(salesPrice);
+        field.push("قیمت فروش کالا");
+
+        res.item.salesPrice = salesPrice;
+        let profit = res.item.purchasePrice - salesPrice;
+        res.item.profit = profit;
+      }
+    }
+    if (date) {
+      if (date != res.item.date) {
+        oldVal.push(res.item.date);
+        newVal.push(date);
+        field.push(" تاریخ خرید کالا");
+
+        res.item.date = date;
+      }
+    }
+    for (let i = 0; i < oldVal.length; i++) {
+      description =
+        description +
+        "<" +
+        field[i] +
+        "> از " +
+        oldVal[i] +
+        "به " +
+        newVal[i] +
+        ". ";
+    }
+
+    // fill Item History props
+    const itemHistory = new itemHistory({
+      item: nameHistory,
+      previousAmount: res.item.amount,
+      newAmount: res.item.amount,
+      action: "ویرایش",
+      profit: res.item.profit,
+      description,
+      date: update,
+    });
+
+    await res.item.save();
+    await itemHistory.save();
+
+    res.status(201);
+    await session.commitTransaction();
   } catch (err) {
     res.status(400).json({ message: err.message });
     session.abortTransaction();
@@ -283,107 +349,164 @@ router.patch("/:id", authenticate, getItem, async (req, res) => {
 });
 
 // Updating One Amount
-router.put("/:id", authenticate, getItem, async (req, res) => {
-  let session;
-  session = client.startSession();
-  try {
-    session.startTransaction();
-    if (
-      req.body.income &&
-      req.body.balance &&
-      req.body.amount &&
-      req.body.profit &&
-      req.body.date
-    ) {
-      let oldVal = res.item.amount;
-      let name = res.item.name;
-      res.item.amount = req.body.amount;
-      const newLog = new ItemLogs({
-        name,
-        oldVal,
-        newVal: req.body.amount,
-        field: "فروش کالا",
-        profit: req.body.profit,
-        date: req.body.date,
+router.put(
+  "/:id",
+  authenticate,
+  getItem,
+  getLastBalanceData,
+  async (req, res) => {
+    let session;
+    try {
+      let sold = req.body.sold;
+      let amount = req.body.amount;
+      let profit = req.body.profit;
+      let date = req.body.date;
+      let description = req.body.description;
+      if (
+        sold == null ||
+        amount == null ||
+        profit == null ||
+        date == null ||
+        description == null
+      ) {
+        res.status(204);
+        return;
+      }
+
+      session = client.startSession();
+      session.startTransaction();
+
+      let current = res.balance.current + sold;
+
+      let previousStockAmount = res.item.amount;
+      let soldItemName = res.item.name;
+      let soldItemCompanyName = res.item.company;
+      let logDescription = "فروش کالای  <" + soldItemName + ">.";
+      let sellerName = res.item.sellerName;
+
+      // update Item Amount Value
+      res.item.amount = amount;
+
+      // fill Item History props
+      const itemHistory = new itemHistory({
+        item: soldItemName,
+        company: soldItemCompanyName,
+        previousAmount: previousStockAmount,
+        newAmount: amount,
+        action: "فروش",
+        profit,
+        logDescription,
+        date,
       });
+
+      // fill Item Balane Effect props
       const balance = new Balance({
-        income: req.body.income,
-        outcome: "0",
-        balance: req.body.balance,
-        date: req.body.date,
+        action: -sold,
+        current,
+        date,
       });
-      let history = new History({
-        cash: "0",
-        card: parseInt(req.body.income),
-        date: req.body.date,
-        description: req.body.description,
-        logicalDelete: false,
+
+      // // fill Item Balance Effect History props
+      const balanceHistory = new BalanceHistory({
+        receiverName: sellerName,
+        amount: -sold,
+        debt: "0",
+        type: "کارت",
+        description,
+        date,
       });
-      await history.save(); // save history
-      await balance.save(); // save balance
-      await newLog.save(); //save log
-      await res.item.save(); // edit item
+
+      await itemHistory.save();
+      await balanceHistory.save();
+      await balance.save();
+      await res.item.save();
+
       res.status(200);
       await session.commitTransaction();
-    } else {
-      res.status(204);
+    } catch (err) {
+      res.status(400).json({ message: err.message });
       session.abortTransaction();
+    } finally {
+      session.endSession();
     }
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-    session.abortTransaction();
-  } finally {
-    session.endSession();
   }
-});
+);
 
 // Deleting One
-router.delete("/:id", authenticate, getItem, async (req, res) => {
-  let session;
-  try {
-    session = client.startSession();
-    session.startTransaction();
-    if (
-      req.body.logicalDelete != null &&
-      req.body.date != null &&
-      req.body.income != null &&
-      req.body.outcome != null &&
-      req.body.balance != null
-    ) {
-      res.item.logicalDelete = req.body.logicalDelete;
-      const balance = new Balance({
-        income: req.body.income,
-        outcome: req.body.outcome,
-        balance: req.body.balance,
-        date: req.body.date,
+router.delete(
+  "/:id",
+  authenticate,
+  getItem,
+  getItemBalanceHistory,
+  async (req, res) => {
+    let session;
+    try {
+      let date = req.body.date;
+      let description = req.body.description;
+
+      if (date == null) {
+        res.status(204);
+        return;
+      }
+
+      session = client.startSession();
+      session.startTransaction();
+
+      let name = res.item.name;
+      let sellerName = res.history.receiverName;
+      let company = res.item.company;
+      let amount = res.item.amount;
+      let profit = res.item.profit;
+      let debt = res.history.debt;
+      let logDescription = "حذف کالای  <" + name + ">.";
+
+      if (parseInt(debt) < 0) {
+        debt = "0";
+      }
+
+      // fill Item Balance Effect History props
+      const balanceHistory = new BalanceHistory({
+        receiverName: sellerName,
+        amount: "0",
+        debt: -debt,
+        type: "بازگشت",
+        description,
+        date,
       });
-      let history = new History({
-        cash: "0",
-        card: -req.body.outcome,
-        date: req.body.date,
-        description: req.body.description,
-        logicalDelete: false,
+
+      // fill Item History props
+      const itemHistory = new itemHistory({
+        item: name,
+        company,
+        previousAmount: amount,
+        newAmount: "0",
+        action: "حذف",
+        profit: profit,
+        logDescription,
+        date,
       });
-      const newLog = new ItemLogs({
-        description: "حذف کالای<" + res.item.name + "> از سیستم.",
-        date: req.body.date,
-      });
-      await history.save(); // save history
-      await balance.save(); // save balance
-      await res.item.save();
-      await newLog.save();
-      res.status(200).json({ message: "Deleted Item" });
+
+      await balanceHistory.save();
+      await itemHistory.save();
+
+      try {
+        await res.blog.deleteOne();
+      } catch (err) {
+        session.abortTransaction();
+        res.status(500).json({ message: err.message });
+        return;
+      }
+
+      res.status(200);
       await session.commitTransaction();
-    } else {
-      res.status(400).json({ message: "Input Check" });
+    } catch (err) {
+      res.status(400).json({ message: err.message });
+      session.abortTransaction();
+    } finally {
+      session.endSession();
     }
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-    session.abortTransaction();
-  } finally {
-    session.endSession();
   }
-});
+);
 
 async function getItem(req, res, next) {
   let item;
@@ -400,4 +523,36 @@ async function getItem(req, res, next) {
   next();
 }
 
+async function getLastBalanceData(req, res, next) {
+  let balance;
+  try {
+    balance = await Balance.find();
+    if (balance == null) {
+      return (res.balance = {
+        action: "0",
+        current: "0",
+        date: "1402/7/1",
+      });
+    }
+    balance = balance[balance.length - 1];
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+
+  res.balance = balance;
+  next();
+}
+
+async function getItemBalanceHistory(req, res, next) {
+  let history;
+  try {
+    let sellerName = req.item.sellerName;
+    history = await BalanceHistory.find({ receiverName: sellerName });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+
+  res.history = history;
+  next();
+}
 module.exports = router;

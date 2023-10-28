@@ -2,13 +2,12 @@ const mongoose = require("mongoose");
 
 const balanceHistorySchema = new mongoose.Schema(
   {
-    cost: String,
-    personName: String,
+    receiverName: String,
+    amount: String,
+    debt: String,
+    type: String,
     description: String,
-    cash: String,
-    card: String,
     date: String,
-    logicalDelete: String,
   },
   { timestamps: true }
 );

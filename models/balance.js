@@ -2,9 +2,8 @@ const mongoose = require("mongoose");
 
 const balanceSchema = new mongoose.Schema(
   {
-    income: String,
-    outcome: String,
-    balance: String,
+    action: String,
+    current: String,
     date: String,
   },
   { timestamps: true }

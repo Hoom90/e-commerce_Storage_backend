@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const Log = require("../models/balanceHistory");
+const BalanceHistory = require("../models/balanceHistory");
 require("dotenv").config();
 
 const authenticate = require("../middleware/authenticate");
@@ -8,7 +8,7 @@ const authenticate = require("../middleware/authenticate");
 // Getting all
 router.get("/", async (req, res) => {
   try {
-    const logs = await Log.find({ logicalDelete: false });
+    const logs = await BalanceHistory.find();
     res.json(logs);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -19,9 +19,8 @@ router.get("/", async (req, res) => {
 router.get("/:date", async (req, res) => {
   try {
     let date = req.params.date;
-    date = date.replace("-", "/");
-    date = date.replace("-", "/");
-    let logs = await Log.find({ date: date, logicalDelete: false });
+    date = date.replace("-", "/").replace("-", "/");
+    let logs = await BalanceHistory.find({ date: date });
     res.json(logs);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -31,39 +30,41 @@ router.get("/:date", async (req, res) => {
 //Update One
 router.patch("/:id", authenticate, getDocument, async (req, res) => {
   try {
-    if (req.body.personName != "" && res.document.personName) {
-      res.document.personName = req.body.personName;
+    let receiverName = req.body.receiverName;
+    let description = req.body.description;
+
+    if (receiverName) {
+      if (receiverName != "" && res.document.personName) {
+        res.document.personName = receiverName;
+      }
     }
-    if (req.body.cost != "" && res.document.cost) {
-      res.document.cost = req.body.cost;
+
+    if (description) {
+      if (description != "" && res.document.description) {
+        res.document.description = description;
+      }
     }
-    if (req.body.description != "" && res.document.description) {
-      res.document.description = req.body.description;
-    }
-    if (req.body.cash != "" && res.document.cash) {
-      res.document.cash = req.body.cash;
-    }
-    if (req.body.card != "" && res.document.card) {
-      res.document.card = req.body.card;
-    }
-    res.status(200).json(await res.document.save());
+
+    await res.document.save();
+
+    res.status(201);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
 });
 
 async function getDocument(req, res, next) {
-  let document;
+  let history;
   try {
-    document = await Log.findById(req.params.id);
-    if (document == null) {
-      return res.status(404).json({ message: "Cannot find Document" });
+    history = await BalanceHistory.findById(req.params.id);
+    if (history == null) {
+      return res.status(404);
     }
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 
-  res.document = document;
+  res.history = history;
   next();
 }
 

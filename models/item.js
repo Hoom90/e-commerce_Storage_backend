@@ -3,15 +3,15 @@ const mongoose = require("mongoose");
 const itemSchema = new mongoose.Schema(
   {
     name: String,
-    weight: String,
-    basePrice: String,
-    price: String,
+    company: String,
+    purchasePrice: String,
+    salesPrice: String,
     profit: String,
     amount: String,
-    billId: String,
-    fileName: String,
+    unit: String,
+    liquidity: String,
+    sellerName: String,
     date: String,
-    logicalDelete: String,
   },
   { timestamps: true }
 );
