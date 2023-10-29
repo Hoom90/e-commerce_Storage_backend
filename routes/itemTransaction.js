@@ -8,7 +8,6 @@ const Balance = require("../models/balance");
 require("dotenv").config();
 
 const authenticate = require("../middleware/authenticate");
-const itemHistory = require("../models/itemHistory");
 const client = new MongoClient(process.env.DATABASE_URL, {
   useUnifiedTopology: true,
 });
@@ -40,48 +39,44 @@ router.get("/:id", async (req, res) => {
 // Creating one
 router.post("/", authenticate, getLastBalanceData, async (req, res) => {
   let session;
+  // item feature
+  let name = req.body.name;
+  let sellerName = req.body.sellerName;
+  let company = req.body.company;
+  let purchasePrice = req.body.purchasePrice;
+  let salesPrice = req.body.salesPrice;
+  let amount = req.body.amount;
+  let unit = req.body.unit;
+  let date = req.body.date;
+  // item dependency
+  let paid = req.body.paid;
+  let type = req.body.type;
+  let description = req.body.description;
+  if (
+    name == null ||
+    company == null ||
+    purchasePrice == null ||
+    salesPrice == null ||
+    amount == null ||
+    unit == null ||
+    sellerName == null ||
+    date == null ||
+    paid == null ||
+    type == null ||
+    description == null
+  ) {
+    res.status(204);
+    return;
+  }
+  let profit = salesPrice - purchasePrice;
+  let liquidity = purchasePrice * amount;
+  let cost = purchasePrice * amount;
+  let debt = cost - paid;
+  let current = res.balance.current - paid;
+  let logDescription = "خرید کالای جدید <" + name + ">.";
   try {
-    // item feature
-    let name = req.body.name;
-    let company = req.body.company;
-    let purchasePrice = req.body.purchasePrice;
-    let salesPrice = req.body.salesPrice;
-    let amount = req.body.amount;
-    let unit = req.body.unit;
-    let sellerName = req.body.sellerName;
-    let date = req.body.date;
-    // item dependency
-    let paid = req.body.paid;
-    let type = req.body.type;
-    let description = req.body.description;
-
-    if (
-      name == null ||
-      company == null ||
-      purchasePrice == null ||
-      salesPrice == null ||
-      amount == null ||
-      unit == null ||
-      sellerName == null ||
-      date == null ||
-      paid == null ||
-      type == null ||
-      description == null
-    ) {
-      res.status(204);
-      return;
-    }
-
-    let profit = purchasePrice - salesPrice;
-    let liquidity = purchasePrice * amount;
-    let cost = purchasePrice * amount;
-    let debt = cost - paid;
-    let current = res.balance.current - paid;
-    let logDescription = "خرید کالای جدید <" + name + ">.";
-
     session = client.startSession();
     session.startTransaction();
-
     // fill Item props
     const item = new Item({
       name,
@@ -95,9 +90,8 @@ router.post("/", authenticate, getLastBalanceData, async (req, res) => {
       sellerName,
       date,
     });
-
     // fill Item History props
-    const itemHistory = new itemHistory({
+    const itemHistory = new ItemHistory({
       item: name,
       company,
       previousAmount: "0",
@@ -107,7 +101,6 @@ router.post("/", authenticate, getLastBalanceData, async (req, res) => {
       logDescription,
       date,
     });
-
     // // fill Item Balance Effect History props
     const balanceHistory = new BalanceHistory({
       receiverName: sellerName,
@@ -117,19 +110,16 @@ router.post("/", authenticate, getLastBalanceData, async (req, res) => {
       description,
       date,
     });
-
     // fill Item Balane Effect props
     const balance = new Balance({
       action: -paid,
       current,
       date,
     });
-
     await item.save();
     await itemHistory.save();
     await balanceHistory.save();
     await balance.save();
-
     res.status(200);
     await session.commitTransaction();
   } catch (err) {
@@ -229,7 +219,7 @@ router.post("/list", authenticate, getLastBalanceData, async (req, res) => {
           date,
         });
         // fill Item History props
-        const itemHistory = new itemHistory({
+        const itemHistory = new ItemHistory({
           item: name,
           company,
           previousAmount: "0",
@@ -325,7 +315,7 @@ router.patch("/:id", authenticate, getItem, async (req, res) => {
     }
 
     // fill Item History props
-    const itemHistory = new itemHistory({
+    const itemHistory = new ItemHistory({
       item: nameHistory,
       previousAmount: res.item.amount,
       newAmount: res.item.amount,
@@ -388,7 +378,7 @@ router.put(
       res.item.amount = amount;
 
       // fill Item History props
-      const itemHistory = new itemHistory({
+      const itemHistory = new ItemHistory({
         item: soldItemName,
         company: soldItemCompanyName,
         previousAmount: previousStockAmount,
@@ -527,19 +517,19 @@ async function getLastBalanceData(req, res, next) {
   let balance;
   try {
     balance = await Balance.find();
-    if (balance == null) {
-      return (res.balance = {
-        action: "0",
-        current: "0",
-        date: "1402/7/1",
-      });
+    if (balance.length == 0) {
+      res.balance = {
+        action: 0,
+        current: 0,
+        date: "1402-7-1",
+      };
+    } else {
+      balance = balance[balance.length - 1];
+      res.balance = balance;
     }
-    balance = balance[balance.length - 1];
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
-
-  res.balance = balance;
   next();
 }
 
