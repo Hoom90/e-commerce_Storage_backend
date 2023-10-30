@@ -289,7 +289,7 @@ router.patch("/:id", authenticate, getItem, async (req, res) => {
         field.push("قیمت فروش کالا");
 
         res.item.salesPrice = salesPrice;
-        let profit = res.item.purchasePrice - salesPrice;
+        let profit = salesPrice - res.item.purchasePrice;
         res.item.profit = profit;
       }
     }
@@ -309,7 +309,7 @@ router.patch("/:id", authenticate, getItem, async (req, res) => {
         field[i] +
         "> از " +
         oldVal[i] +
-        "به " +
+        " به " +
         newVal[i] +
         ". ";
     }
@@ -317,6 +317,7 @@ router.patch("/:id", authenticate, getItem, async (req, res) => {
     // fill Item History props
     const itemHistory = new ItemHistory({
       item: nameHistory,
+      company: res.item.company,
       previousAmount: res.item.amount,
       newAmount: res.item.amount,
       action: "ویرایش",
@@ -433,15 +434,12 @@ router.delete(
     try {
       let date = req.body.date;
       let description = req.body.description;
-
       if (date == null) {
         res.status(204);
         return;
       }
-
       session = client.startSession();
       session.startTransaction();
-
       let name = res.item.name;
       let sellerName = res.history.receiverName;
       let company = res.item.company;
@@ -449,11 +447,9 @@ router.delete(
       let profit = res.item.profit;
       let debt = res.history.debt;
       let logDescription = "حذف کالای  <" + name + ">.";
-
       if (parseInt(debt) < 0) {
         debt = "0";
       }
-
       // fill Item Balance Effect History props
       const balanceHistory = new BalanceHistory({
         receiverName: sellerName,
@@ -463,9 +459,8 @@ router.delete(
         description,
         date,
       });
-
       // fill Item History props
-      const itemHistory = new itemHistory({
+      const itemHistory = new ItemHistory({
         item: name,
         company,
         previousAmount: amount,
@@ -475,18 +470,15 @@ router.delete(
         logDescription,
         date,
       });
-
       await balanceHistory.save();
       await itemHistory.save();
-
       try {
-        await res.blog.deleteOne();
+        await res.item.deleteOne();
       } catch (err) {
         session.abortTransaction();
         res.status(500).json({ message: err.message });
         return;
       }
-
       res.status(200);
       await session.commitTransaction();
     } catch (err) {
@@ -536,7 +528,7 @@ async function getLastBalanceData(req, res, next) {
 async function getItemBalanceHistory(req, res, next) {
   let history;
   try {
-    let sellerName = req.item.sellerName;
+    let sellerName = res.item.sellerName;
     history = await BalanceHistory.find({ receiverName: sellerName });
   } catch (err) {
     return res.status(500).json({ message: err.message });
