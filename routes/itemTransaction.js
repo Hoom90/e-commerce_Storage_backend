@@ -140,12 +140,14 @@ router.post("/list", authenticate, getLastBalanceData, async (req, res) => {
     let type = req.body[0].type;
     let date = req.body[0].date;
     let description = req.body[0].description;
+    let sellerName = req.body[0].sellerName;
 
     if (
       cost == null ||
       paid == null ||
       type == null ||
       description == null ||
+      sellerName == null ||
       date == null
     ) {
       res.status(204);
@@ -157,7 +159,6 @@ router.post("/list", authenticate, getLastBalanceData, async (req, res) => {
 
     let debt = cost - paid;
     let current = res.balance.current - paid;
-    let sellerName = data[1].sellerName;
 
     // // fill Item Balance Effect History props
     const balanceHistory = new BalanceHistory({
@@ -184,8 +185,6 @@ router.post("/list", authenticate, getLastBalanceData, async (req, res) => {
       let salesPrice = data[i].salesPrice;
       let amount = data[i].amount;
       let unit = data[i].unit;
-      let sellerName = data[i].sellerName;
-      let date = data[i].date;
 
       let profit = purchasePrice - salesPrice;
       let liquidity = purchasePrice * amount;
@@ -197,41 +196,39 @@ router.post("/list", authenticate, getLastBalanceData, async (req, res) => {
         purchasePrice == null ||
         salesPrice == null ||
         amount == null ||
-        unit == null ||
-        sellerName == null ||
-        date == null
+        unit == null
       ) {
         res.status(204);
         session.abortTransaction();
         return;
-      } else {
-        // fill Item props
-        const item = new Item({
-          name,
-          company,
-          purchasePrice,
-          salesPrice,
-          profit,
-          amount,
-          unit,
-          liquidity,
-          sellerName,
-          date,
-        });
-        // fill Item History props
-        const itemHistory = new ItemHistory({
-          item: name,
-          company,
-          previousAmount: "0",
-          newAmount: amount,
-          action: "خرید",
-          profit,
-          logDescription,
-          date,
-        });
-        await item.save();
-        await itemHistory.save();
       }
+      // console.log(data[i]);
+      // fill Item props
+      const item = new Item({
+        name,
+        company,
+        purchasePrice,
+        salesPrice,
+        profit,
+        amount,
+        unit,
+        liquidity,
+        sellerName,
+        date,
+      });
+      // fill Item History props
+      const itemHistory = new ItemHistory({
+        item: name,
+        company,
+        previousAmount: "0",
+        newAmount: amount,
+        action: "خرید",
+        profit,
+        logDescription,
+        date,
+      });
+      await item.save();
+      await itemHistory.save();
     }
 
     await balance.save();
