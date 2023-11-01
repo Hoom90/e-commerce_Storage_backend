@@ -5,6 +5,7 @@ const balanceSchema = new mongoose.Schema(
     action: String,
     current: String,
     date: String,
+    fk: String,
   },
   { timestamps: true }
 );

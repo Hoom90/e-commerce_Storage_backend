@@ -40,7 +40,6 @@ router.post("/expense", authenticate, getLastBalanceData, async (req, res) => {
     let description = req.body.description;
     let type = req.body.type;
     let date = req.body.date;
-    // let debt = "0";
 
     if (
       receiverName == null ||
@@ -53,29 +52,32 @@ router.post("/expense", authenticate, getLastBalanceData, async (req, res) => {
       return;
     }
 
-    let current = res.balance.current - paid;
+    let current = parseInt(res.balance.current) - parseInt(paid);
+    let fk = Math.floor(Math.random() * 1000000000) + 1;
     session = client.startSession();
     session.startTransaction();
 
     // fill LOST balance prop
-    const Balance = new Balance({
+    const balance = new Balance({
       action: -paid,
       current,
       date,
+      fk,
     });
 
     // fill balance log prop
-    const BalanceHistory = new BalanceHistory({
+    const balanceHistory = new BalanceHistory({
       receiverName,
       amount: -paid,
       debt: "0",
       type,
       description,
       date,
+      fk,
     });
 
-    await Balance.save();
-    await BalanceHistory.save();
+    await balance.save();
+    await balanceHistory.save();
 
     res.status(200);
     await session.commitTransaction();
@@ -107,30 +109,30 @@ router.post("/earning", authenticate, getLastBalanceData, async (req, res) => {
       res.status(400);
       return;
     }
-    let current = res.balance.current + paid;
+    let current = parseInt(res.balance.current) + parseInt(paid);
 
     session = client.startSession();
     session.startTransaction();
 
     // fill EARN balance prop
-    const Balance = new Balance({
+    const balance = new Balance({
       action: paid,
       current,
       date,
     });
 
     // fill balance log prop
-    const BalanceHistory = new BalanceHistory({
+    const balanceHistory = new BalanceHistory({
       receiverName,
-      amount: +paid,
+      amount: paid,
       debt: "0",
       type,
       description,
       date,
     });
 
-    await Balance.save();
-    await BalanceHistory.save();
+    await balance.save();
+    await balanceHistory.save();
 
     res.status(200);
     await session.commitTransaction();
@@ -201,50 +203,26 @@ router.delete(
   authenticate,
   getBalanceHistory,
   getLastBalanceData,
+  getBalance,
   async (req, res) => {
     let session;
     try {
-      let receiverName = req.body.receiverName;
-      let amount = req.body.amount;
-      let date = req.body.date;
-      let description = req.body.description;
-
-      if (receiverName == null || amount == null || date == null) {
-        res.status(204);
-        return;
-      }
-
       session = client.startSession();
       session.startTransaction();
 
-      let current = parseInt(res.balance.current) - amount;
-      // fill Item Balance Effect History props
-      const BalanceHistory = new BalanceHistory({
-        receiverName,
-        amount,
-        debt: "0",
-        type: "حذف",
-        description,
-        date,
-      });
-
-      const Balance = new Balance({
-        action: "حذف",
-        current,
-        date,
-      });
-
-      await Balance.save();
-      await BalanceHistory.save();
-
+      try {
+        await res.balance.deleteOne();
+        await res.history.deleteOne();
+      } catch (err) {
+        session.abortTransaction();
+        res.status(500).json({ message: err.message });
+        return;
+      }
       res.status(201);
-
       await session.commitTransaction();
     } catch (err) {
       res.status(400).json({ message: err.message });
       session.abortTransaction();
-    } finally {
-      session.endSession();
     }
   }
 );
@@ -252,18 +230,17 @@ router.delete(
 async function getBalanceHistory(req, res, next) {
   let history;
   try {
-    let receiverName = req.body.receiverName;
-    if (receiverName == null) {
+    let id = req.body.id;
+    if (id == null) {
       return res.status(204);
     }
-    history = await BalanceHistory.find({ receiverName: receiverName });
+    history = await BalanceHistory.findById(id);
     if (history == null) {
       return res.status(404).json({ message: "Cannot find Log" });
     }
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
-
   res.history = history;
   next();
 }
@@ -284,6 +261,25 @@ async function getLastBalanceData(req, res, next) {
     return res.status(500).json({ message: err.message });
   }
 
+  res.balance = balance;
+  next();
+}
+
+async function getBalance(req, res, next) {
+  let balance;
+  try {
+    let fk = req.body.fk;
+    if (fk == null) {
+      return res.status(204);
+    }
+    balance = await Balance.findOne({ fk: fk });
+    if (balance == null) {
+      return res.status(404).json({ message: "Cannot find Balance" });
+    }
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+  console.log(balance);
   res.balance = balance;
   next();
 }

@@ -8,6 +8,7 @@ const balanceHistorySchema = new mongoose.Schema(
     type: String,
     description: String,
     date: String,
+    fk: String,
   },
   { timestamps: true }
 );
