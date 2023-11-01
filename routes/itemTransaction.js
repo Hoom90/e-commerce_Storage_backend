@@ -125,8 +125,6 @@ router.post("/", authenticate, getLastBalanceData, async (req, res) => {
   } catch (err) {
     res.status(400).json({ message: err.message });
     session.abortTransaction();
-  } finally {
-    session.endSession();
   }
 });
 
@@ -331,8 +329,6 @@ router.patch("/:id", authenticate, getItem, async (req, res) => {
   } catch (err) {
     res.status(400).json({ message: err.message });
     session.abortTransaction();
-  } finally {
-    session.endSession();
   }
 });
 
@@ -350,21 +346,16 @@ router.put(
       let profit = req.body.profit;
       let date = req.body.date;
       let description = req.body.description;
-      if (
-        sold == null ||
-        amount == null ||
-        profit == null ||
-        date == null ||
-        description == null
-      ) {
+      if (sold == null || amount == null || profit == null || date == null) {
         res.status(204);
         return;
       }
+      console.log("hi");
 
       session = client.startSession();
       session.startTransaction();
 
-      let current = res.balance.current + sold;
+      let current = parseInt(res.balance.current) + parseInt(sold);
 
       let previousStockAmount = res.item.amount;
       let soldItemName = res.item.name;
@@ -373,7 +364,7 @@ router.put(
       let sellerName = res.item.sellerName;
 
       // update Item Amount Value
-      res.item.amount = amount;
+      res.item.amount = parseInt(previousStockAmount) - parseInt(amount);
 
       // fill Item History props
       const itemHistory = new ItemHistory({
@@ -389,7 +380,7 @@ router.put(
 
       // fill Item Balane Effect props
       const balance = new Balance({
-        action: -sold,
+        action: sold,
         current,
         date,
       });
@@ -397,7 +388,7 @@ router.put(
       // // fill Item Balance Effect History props
       const balanceHistory = new BalanceHistory({
         receiverName: sellerName,
-        amount: -sold,
+        amount: sold,
         debt: "0",
         type: "کارت",
         description,
@@ -414,8 +405,6 @@ router.put(
     } catch (err) {
       res.status(400).json({ message: err.message });
       session.abortTransaction();
-    } finally {
-      session.endSession();
     }
   }
 );
