@@ -96,6 +96,7 @@ router.post("/", authenticate, getLastBalanceData, async (req, res) => {
       company,
       previousAmount: "0",
       newAmount: amount,
+      unit,
       action: "خرید",
       profit,
       logDescription,
@@ -220,6 +221,7 @@ router.post("/list", authenticate, getLastBalanceData, async (req, res) => {
         company,
         previousAmount: "0",
         newAmount: amount,
+        unit,
         action: "خرید",
         profit,
         logDescription,
@@ -315,6 +317,7 @@ router.patch("/:id", authenticate, getItem, async (req, res) => {
       company: res.item.company,
       previousAmount: res.item.amount,
       newAmount: res.item.amount,
+      unit: res.item.unit,
       action: "ویرایش",
       profit: res.item.profit,
       description,
@@ -362,6 +365,7 @@ router.put(
       let soldItemCompanyName = res.item.company;
       let logDescription = "فروش کالای  <" + soldItemName + ">.";
       let sellerName = res.item.sellerName;
+      let unit = res.item.unit;
 
       // update Item Amount Value
       res.item.amount = parseInt(previousStockAmount) - parseInt(amount);
@@ -372,6 +376,7 @@ router.put(
         company: soldItemCompanyName,
         previousAmount: previousStockAmount,
         newAmount: amount,
+        unit,
         action: "فروش",
         profit,
         logDescription,
@@ -430,6 +435,7 @@ router.delete(
       let sellerName = res.history.receiverName;
       let company = res.item.company;
       let amount = res.item.amount;
+      let unit = res.item.unit;
       let profit = res.item.profit;
       let debt = res.history.debt;
       let logDescription = "حذف کالای  <" + name + ">.";
@@ -451,6 +457,7 @@ router.delete(
         company,
         previousAmount: amount,
         newAmount: "0",
+        unit,
         action: "حذف",
         profit: profit,
         logDescription,

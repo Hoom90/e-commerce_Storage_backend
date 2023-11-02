@@ -6,6 +6,7 @@ const itemHistorySchema = new mongoose.Schema(
     company: String,
     previousAmount: String,
     newAmount: String,
+    unit: String,
     action: String,
     profit: String,
     description: String,
