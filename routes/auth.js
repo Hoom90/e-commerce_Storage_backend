@@ -9,7 +9,7 @@ router.post("/login", async (req, res, next) => {
   try {
     const db = await User.find();
     if (db.length == 0) {
-      let password = "123";
+      let password = "Vemh0zSYBf";
       let username = "admin";
       bcrypt.hash(password, 10, function (err, hashedPass) {
         if (err) {
